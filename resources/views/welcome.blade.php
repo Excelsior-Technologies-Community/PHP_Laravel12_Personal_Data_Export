@@ -1,95 +1,163 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Personal Data Export</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
 
     <style>
-        body {
-            font-family: Arial;
-            background: #f2f2f2;
-            text-align: center;
-            margin-top: 120px;
+        *{
+            margin:0;
+            padding:0;
+            box-sizing:border-box;
+            font-family: 'Poppins', sans-serif;
         }
 
-        .box {
-            background: white;
-            padding: 40px;
-            width: 420px;
-            margin: auto;
-            border-radius: 10px;
-            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        body{
+            height:100vh;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            background: linear-gradient(135deg, #667eea, #764ba2);
         }
 
-        .btn {
-            background: #28a745;
-            color: white;
-            padding: 12px 25px;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            cursor: pointer;
+        .card{
+            background:#fff;
+            width:420px;
+            padding:35px;
+            border-radius:15px;
+            box-shadow:0 15px 40px rgba(0,0,0,0.2);
+            text-align:center;
+            animation: fadeIn 0.6s ease;
         }
 
-        .btn:hover {
-            background: #218838;
+        @keyframes fadeIn {
+            from {opacity:0; transform: translateY(20px);}
+            to {opacity:1; transform: translateY(0);}
         }
 
-        .msg {
-            margin-top: 20px;
-            font-weight: bold;
-            display: none;
+        h2{
+            margin-bottom:10px;
+            color:#333;
         }
 
-        .loading {
-            color: green;
+        p{
+            font-size:14px;
+            color:#777;
+            margin-bottom:25px;
         }
 
-        .success {
-            color: blue;
+        .fields{
+            text-align:left;
+            margin-bottom:20px;
         }
+
+        .fields label{
+            display:flex;
+            align-items:center;
+            margin-bottom:12px;
+            cursor:pointer;
+            padding:10px;
+            border-radius:8px;
+            transition:0.3s;
+        }
+
+        .fields label:hover{
+            background:#f3f4f6;
+        }
+
+        input[type="checkbox"]{
+            margin-right:10px;
+            transform: scale(1.2);
+            accent-color:#667eea;
+        }
+
+        .btn{
+            width:100%;
+            padding:12px;
+            border:none;
+            border-radius:8px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color:white;
+            font-size:15px;
+            cursor:pointer;
+            transition:0.3s;
+        }
+
+        .btn:hover{
+            opacity:0.9;
+            transform: translateY(-1px);
+        }
+
+        .history{
+            margin-top:18px;
+            display:inline-block;
+            font-size:14px;
+            color:#667eea;
+            text-decoration:none;
+            font-weight:500;
+        }
+
+        .history:hover{
+            text-decoration:underline;
+        }
+
+        .footer{
+            margin-top:20px;
+            font-size:12px;
+            color:#aaa;
+        }
+
     </style>
-
 </head>
 
 <body>
 
-    <div class="box">
+<div class="card">
 
-        <h2>Export Personal Data</h2>
+    <h2>Export Your Data</h2>
+    <p>Select the information you want to download</p>
 
-        <button class="btn" onclick="exportData()">Export Data</button>
+    <form method="GET" action="/export/1">
 
-        <div class="msg loading" id="loadingMsg">
-            Export started! File downloading...
+        <div class="fields">
+
+            <label>
+                <input type="checkbox" name="fields[]" value="name" checked>
+                Full Name
+            </label>
+
+            <label>
+                <input type="checkbox" name="fields[]" value="email" checked>
+                Email Address
+            </label>
+
+            <label>
+                <input type="checkbox" name="fields[]" value="phone">
+                Phone Number
+            </label>
+
+            <label>
+                <input type="checkbox" name="fields[]" value="address">
+                Address
+            </label>
+
         </div>
 
-        <div class="msg success" id="successMsg">
-            Download completed successfully!
-        </div>
+        <button class="btn">Download Data</button>
 
+    </form>
+
+    <a href="/history" class="history">View Export History →</a>
+
+    <div class="footer">
+        Secure • GDPR Ready
     </div>
 
-    <script>
-
-        function exportData() {
-            // show loading message
-            document.getElementById("loadingMsg").style.display = "block";
-
-            // start download
-            window.location.href = "/export/1";
-
-            // simulate download complete
-            setTimeout(function () {
-
-                document.getElementById("loadingMsg").style.display = "none";
-                document.getElementById("successMsg").style.display = "block";
-
-            }, 3000); // 3 seconds
-        }
-
-    </script>
+</div>
 
 </body>
-
 </html>
