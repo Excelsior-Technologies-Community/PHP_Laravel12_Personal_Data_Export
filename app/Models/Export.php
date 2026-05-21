@@ -9,11 +9,15 @@ class Export extends Model
     protected $fillable = [
         'user_id',
         'file_name',
-        'exported_at'
+        'file_size',
+        'format',
+        'exported_at',
+        'ip_address',
+        'is_bulk'
     ];
-
-    public function user()
-    {
-        return $this->belongsTo(User::class);
-    }
+    
+    protected $casts = [
+        'exported_at' => 'datetime',
+        'is_bulk' => 'boolean'
+    ];
 }
