@@ -6,21 +6,29 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\Export;
 use ZipArchive;
+use Illuminate\Support\Facades\Hash;
 
 class ExportController extends Controller
 {
     public function export(Request $request, $id)
     {
+        $request->validate([
+            'password' => 'required',
+            'format' => 'required|in:json,csv,xml'
+        ]);
+
         $user = User::with('profile')->findOrFail($id);
-        
-        $fields = $request->fields ?? [];
+
+        if (!Hash::check($request->password, $user->password)) {
+            return redirect()->back()->withErrors(['password' => 'Incorrect password for this user!']);
+        }
+
+        $fields = $request->fields ?? ['name', 'email', 'phone', 'address'];
         $format = $request->format ?? 'json';
         
         $data = $this->prepareData($user, $fields);
         
-        // Generate file based on format
         $fileName = "user-data-{$user->id}-" . time();
-        $filePath = storage_path($fileName);
         
         switch ($format) {
             case 'csv':
@@ -33,10 +41,8 @@ class ExportController extends Controller
                 $fullPath = $this->generateJSON($data, $fileName);
         }
         
-        // Calculate file size
         $fileSize = file_exists($fullPath) ? filesize($fullPath) : 0;
         
-        // SAVE HISTORY
         Export::create([
             'user_id' => $user->id,
             'file_name' => basename($fullPath),
@@ -52,34 +58,39 @@ class ExportController extends Controller
     
     public function bulkExport(Request $request)
     {
-        $userIds = json_decode($request->user_ids, true) ?? [];
+        $request->validate([
+            'password' => 'required',
+            'user_ids' => 'required|json',
+            'format' => 'required|in:json,csv'
+        ]);
+
+        $admin = User::find(1);
+        if ($admin && !Hash::check($request->password, $admin->password)) {
+            return redirect()->back()->withErrors(['password' => 'Admin password incorrect!']);
+        }
+
+        $userIds = json_decode($request->user_ids, true);
         $format = $request->format ?? 'json';
         
         if (empty($userIds)) {
-            return redirect()->back()->with('error', 'No users selected');
+            return redirect()->back()->withErrors(['error' => 'No users selected']);
         }
         
         $users = User::with('profile')->whereIn('id', $userIds)->get();
         $allData = [];
         
         foreach ($users as $user) {
-            $data = $this->prepareData($user, ['name', 'email', 'phone', 'address']);
-            $allData['user_' . $user->id] = $data;
+            $allData['user_' . $user->id] = $this->prepareData($user, ['name', 'email', 'phone', 'address']);
         }
         
         $fileName = "bulk-export-" . time();
         
-        switch ($format) {
-            case 'csv':
-                $fullPath = $this->generateBulkCSV($allData, $fileName);
-                break;
-            default:
-                $fullPath = $this->generateBulkJSON($allData, $fileName);
-        }
+        $fullPath = ($format === 'csv') 
+            ? $this->generateBulkCSV($allData, $fileName) 
+            : $this->generateBulkJSON($allData, $fileName);
         
         $fileSize = file_exists($fullPath) ? filesize($fullPath) : 0;
         
-        // Save bulk export history
         foreach ($users as $user) {
             Export::create([
                 'user_id' => $user->id,
@@ -99,27 +110,24 @@ class ExportController extends Controller
     {
         $query = Export::latest();
         
-        // Search functionality
-        if ($request->has('search') && $request->search) {
+        if ($request->search) {
             $query->where(function($q) use ($request) {
-                $q->where('file_name', 'like', '%' . $request->search . '%')
-                  ->orWhere('user_id', 'like', '%' . $request->search . '%');
+                $q->where('file_name', 'like', "%{$request->search}%")
+                  ->orWhere('user_id', $request->search);
             });
         }
         
-        // Filter by format
-        if ($request->has('format') && $request->format) {
+        if ($request->format) {
             $query->where('format', $request->format);
         }
         
         $exports = $query->paginate(15);
         
-        // Get statistics with error handling
         $stats = [
             'total_exports' => Export::count(),
-            'total_size' => Export::sum('file_size') ?? 0,
+            'total_size' => Export::sum('file_size'),
             'unique_users' => Export::distinct('user_id')->count('user_id'),
-            'formats' => Export::select('format')->distinct()->whereNotNull('format')->get()
+            'formats' => Export::select('format')->distinct()->get()
         ];
         
         return view('history', compact('exports', 'stats'));
@@ -130,9 +138,7 @@ class ExportController extends Controller
         $export = Export::findOrFail($id);
         $filePath = storage_path($export->file_name);
         
-        if (file_exists($filePath)) {
-            unlink($filePath);
-        }
+        if (file_exists($filePath)) unlink($filePath);
         
         $export->delete();
         
@@ -142,12 +148,9 @@ class ExportController extends Controller
     public function deleteAllExports()
     {
         $exports = Export::all();
-        
         foreach ($exports as $export) {
             $filePath = storage_path($export->file_name);
-            if (file_exists($filePath)) {
-                unlink($filePath);
-            }
+            if (file_exists($filePath)) unlink($filePath);
         }
         
         Export::truncate();
@@ -158,33 +161,10 @@ class ExportController extends Controller
     private function prepareData($user, $fields)
     {
         $data = [];
-        
-        if (in_array('name', $fields)) {
-            $data['name'] = $user->name;
-        }
-        
-        if (in_array('email', $fields)) {
-            $data['email'] = $user->email;
-        }
-        
-        if (in_array('phone', $fields) && $user->profile) {
-            $data['phone'] = $user->profile->phone ?? '';
-        }
-        
-        if (in_array('address', $fields) && $user->profile) {
-            $data['address'] = $user->profile->address ?? '';
-        }
-        
-        if (empty($data)) {
-            $data = [
-                'name' => $user->name,
-                'email' => $user->email,
-            ];
-            if ($user->profile) {
-                $data['phone'] = $user->profile->phone ?? '';
-                $data['address'] = $user->profile->address ?? '';
-            }
-        }
+        if (in_array('name', $fields)) $data['name'] = $user->name;
+        if (in_array('email', $fields)) $data['email'] = $user->email;
+        if (in_array('phone', $fields) && $user->profile) $data['phone'] = $user->profile->phone ?? '';
+        if (in_array('address', $fields) && $user->profile) $data['address'] = $user->profile->address ?? '';
         
         $data['exported_at'] = now()->toDateTimeString();
         $data['exported_by'] = request()->ip();
@@ -230,13 +210,11 @@ class ExportController extends Controller
         $fullPath = storage_path($fileName . '.csv');
         $file = fopen($fullPath, 'w');
         fputcsv($file, ['User ID', 'Field', 'Value']);
-        
         foreach ($allData as $userId => $userData) {
             foreach ($userData as $key => $value) {
                 fputcsv($file, [$userId, $key, $value]);
             }
         }
-        
         fclose($file);
         return $fullPath;
     }
